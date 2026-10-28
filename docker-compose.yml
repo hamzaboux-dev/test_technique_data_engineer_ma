@@ -1,0 +1,71 @@
+version: "3.8"
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./spark_jobs:/opt/airflow/spark_jobs
+    - ./ingestion:/opt/airflow/ingestion
+    - ./logs:/opt/airflow/logs
+  depends_on:
+    - postgres
+
+services:
+  postgres:
+    image: postgres:15
+    env_file: .env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command: -c "airflow db migrate && airflow users create --username admin --password admin --firstname a --lastname b --role Admin --email admin@example.com"
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - airflow-init
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      - airflow-init
+
+  spark-master:
+    image: bitnami/spark:3.5
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"
+      - "8081:8080"
+
+  spark-worker:
+    image: bitnami/spark:3.5
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+
+  minio:
+    image: minio/minio:latest
+    env_file: .env
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+volumes:
+  postgres-data:
+  minio-data:

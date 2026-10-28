@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+logs/
+*.csv
+*.parquet
+minio-data/
+postgres-data/
+.env.local
+.idea/
