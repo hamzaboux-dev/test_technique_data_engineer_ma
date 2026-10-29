@@ -1,15 +1,18 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: taxi-pipeline-airflow:latest
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    _PIP_ADDITIONAL_REQUIREMENTS: "requests boto3 pandas"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./spark_jobs:/opt/airflow/spark_jobs
     - ./ingestion:/opt/airflow/ingestion
     - ./logs:/opt/airflow/logs
+    - /var/run/docker.sock:/var/run/docker.sock
   depends_on:
     - postgres
 
@@ -41,11 +44,14 @@ services:
 
   spark-master:
     image: bitnamilegacy/spark:3.5
+    container_name: spark-master
     environment:
       - SPARK_MODE=master
     ports:
       - "7077:7077"
       - "8081:8080"
+    volumes:
+      - ./spark_jobs:/opt/bitnami/spark/jobs
 
   spark-worker:
     image: bitnamilegacy/spark:3.5
