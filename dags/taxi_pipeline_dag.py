@@ -1,6 +1,6 @@
 """
-DAG Airflow : orchestre le pipeline Chicago Taxi de bout en bout.
-ingestion (bronze) -> bronze_to_silver (spark) -> silver_to_gold (spark)
+DAG Airflow qui orchestre le pipeline Chicago Taxi de bout en bout :
+ingestion (bronze) -> bronze_to_silver (spark) -> silver_to_gold (spark).
 """
 
 import sys
@@ -19,14 +19,27 @@ default_args = {
 
 
 def _run_ingestion():
+    """
+    Tache d'ingestion : appelle simplement le script Python qui va
+    chercher les donnees sur l'API de Chicago et les depose en bronze.
+    """
     from fetch_taxi_data import run
     run()
 
 
 def _spark_submit(script_path: str):
-    """Execute spark-submit a l'interieur du conteneur spark-master deja
-    demarre, via le socket Docker partage (evite de dupliquer Spark/Java
-    dans l'image Airflow)."""
+    """
+    Lance un job Spark en executant spark-submit a l'interieur du
+    conteneur spark-master, qui est deja equipe de Spark et de Java.
+    On passe par le socket Docker partage entre les conteneurs plutot
+    que de reinstaller Spark dans l'image Airflow, ce qui evite
+    d'alourdir inutilement cette image.
+
+    Le parametre user="root" est necessaire : sans lui, Hadoop
+    n'arrive pas a resoudre l'utilisateur systeme dans le contexte
+    d'un docker exec sans terminal, et le job echoue avant meme de
+    demarrer.
+    """
     client = docker.DockerClient(base_url="unix://var/run/docker.sock")
     container = client.containers.get("spark-master")
     exit_code, output = container.exec_run(
@@ -47,6 +60,7 @@ def _spark_submit(script_path: str):
     print(output.decode(errors="replace"))
     if exit_code != 0:
         raise RuntimeError(f"spark-submit a echoue (code {exit_code}) pour {script_path}")
+
 
 with DAG(
     dag_id="taxi_pipeline",

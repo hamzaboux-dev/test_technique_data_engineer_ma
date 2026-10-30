@@ -1,14 +1,19 @@
 """
-Spark job : lit la couche bronze (CSV bruts), nettoie / type / deduplique,
-et ecrit la couche silver en Parquet, partitionnee par pickup_community_area.
+Job Spark : lit la couche bronze (les CSV bruts), nettoie et type les
+donnees, retire les doublons, puis ecrit le resultat en couche silver
+au format Parquet, partitionne par pickup_community_area.
 """
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 
-def main():
-    spark = (
+def build_spark_session():
+    """
+    Cree la session Spark et configure la connexion au stockage objet
+    MinIO/Silo via le connecteur s3a.
+    """
+    return (
         SparkSession.builder
         .appName("bronze_to_silver")
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
@@ -19,9 +24,15 @@ def main():
         .getOrCreate()
     )
 
-    df = spark.read.option("header", True).csv("s3a://datalake/bronze/taxi_trips/")
 
-    df_clean = (
+def clean_trips(df):
+    """
+    Applique les regles de nettoyage sur les trajets bruts : conversion
+    des timestamps et des montants vers leurs vrais types, suppression
+    des doublons sur trip_id, et filtrage des lignes clairement invalides
+    (date de depart manquante, montant negatif).
+    """
+    return (
         df
         .withColumn("trip_start_timestamp", F.to_timestamp("trip_start_timestamp"))
         .withColumn("trip_end_timestamp", F.to_timestamp("trip_end_timestamp"))
@@ -32,6 +43,14 @@ def main():
         .filter(F.col("trip_start_timestamp").isNotNull())
         .filter(F.col("trip_total") >= 0)
     )
+
+
+def main():
+
+    spark = build_spark_session()
+
+    df = spark.read.option("header", True).csv("s3a://datalake/bronze/taxi_trips/")
+    df_clean = clean_trips(df)
 
     (
         df_clean.write
