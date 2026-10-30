@@ -59,9 +59,9 @@ docker compose exec airflow-webserver airflow dags trigger taxi_pipeline
 ### Vérifier que ça a marché
 
 Dans la console MinIO/Silo (http://localhost:9001), le bucket `datalake` doit contenir :
-- `bronze/taxi_trips/` — les fichiers CSV bruts, tels que reçus de l'API
-- `silver/taxi_trips/` — les données nettoyées, en Parquet, partitionnées par `pickup_community_area`
-- `gold/revenue_by_day/`, `gold/avg_duration/`, `gold/top_pickup_zones/` — les trois tables d'agrégats, en Parquet
+- `bronze/taxi_trips/` ,les fichiers CSV bruts, tels que reçus de l'API
+- `silver/taxi_trips/` , les données nettoyées, en Parquet, partitionnées par `pickup_community_area`
+- `gold/revenue_by_day/`, `gold/avg_duration/`, `gold/top_pickup_zones/` , les trois tables d'agrégats, en Parquet
 
 Chaque dossier Silver et Gold contient aussi un fichier `_SUCCESS`, qui est simplement le marqueur standard que Spark dépose pour confirmer qu'une écriture s'est terminée sans erreur.
 
